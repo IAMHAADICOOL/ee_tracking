@@ -300,6 +300,4 @@ This is a deliberately honest result, not a "wins everywhere" claim.
 
 ---
 
-## License
 
-MIT (or your choice).
