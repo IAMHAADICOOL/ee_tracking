@@ -189,78 +189,107 @@ python -m scripts.compare --residual models/res_fs_filt6.zip \
 
 ### `scripts/train.py`
 
-| Flag | Default | What it does / sensible values |
-|---|---|---|
-| `--mode {residual,end2end}` | `residual` | `residual`: RL correction added on top of the IK controller (recommended). `end2end`: RL outputs the full joint command with no controller — a much harder baseline kept for contrast. |
-| `--timesteps INT` | `200000` | Total env steps. ~50k = quick sanity; 200k per clean/wide curriculum stage; 400k for the uncertainty stage (it has the most to learn). |
-| `--episode_seconds FLOAT` | `12.0` | Episode length in seconds (sets max steps). Use **≥16** so even the slowest trajectory finishes a full loop; shorter and the arm never completes a cycle. |
-| `--n_envs INT` | `4` | Parallel headless envs for throughput; 8 is comfortable on one GPU. Ignored when `--watch` (forces 1). |
-| `--seed INT` | `0` | RNG seed. |
-| `--tag STR` | `None` → `mode[+_unc]` | Output name; controls `models/<tag>*` and `runs/<tag>`. Use a unique tag per run so nothing overwrites. |
-| `--load PATH` | `None` | Continue from a saved `.zip` (curriculum / fine-tune). Obs dims must match, so you **cannot** load a `frame_stack=1` model into a `frame_stack=4` run. |
-| `--wide_workspace` | off | Spread trajectories across the workspace (some segments deliberately unreachable). Off = centred near home, all reachable. On for the generalization stage. |
-| `--unreachable_frac FLOAT` | `1.0` | With `--wide_workspace`: fraction of episodes placed aggressively. `1.0` = all wide; **`0.4`** = 40 % wide / 60 % reachable (recommended mix); `0.0` = effectively local. Ignored without `--wide_workspace`. |
-| `--uncertainty` | off | Enable the disturbance model (domain-randomized per episode in training). Off = clean dynamics. |
-| `--unc_vel_gain FLOAT` | `0.70` | Actuator gain (executed = gain × commanded). `1.0` = none; `0.85` = mild (15 % undershoot); `0.70` = hard (30 %). In training sampled per-episode in `[gain, 1]`. |
-| `--unc_control_delay INT` | `12` | Control latency in sim substeps (240 Hz). `0` = none; `8` ≈ 33 ms; `12` ≈ 50 ms. Sampled per-episode in `[0, value]`. |
-| `--unc_obs_noise FLOAT` | `0.005` | Std of Gaussian noise on the policy’s observation (robustness only — does **not** touch the controller). |
-| `--unc_act_noise FLOAT` | `0.02` | Std of Gaussian noise on the executed command (stability stressor). |
-| `--w_track FLOAT` | `1.0` | Weight on the tracking reward `exp(−err/σ)`. |
-| `--sigma_pos FLOAT` | `0.02` | Error scale σ (m) in the tracking reward. Smaller = sharper gradient near zero (rewards sub-mm) but flatter far out. Final model used `0.008`. |
-| `--w_act FLOAT` | `0.01` | Penalty on residual **magnitude**. Higher pushes the residual toward 0 (helps recover baseline when clean). |
-| `--w_smooth FLOAT` | `0.05` | Penalty on action **rate** (jerk). Higher = smoother, but eventually trades accuracy. Final model used `1.5` (with filtering). |
-| `--frame_stack INT` | `1` | Stack the last N observations for temporal context so the policy can infer the disturbance. `1` = single frame; **`4`** for the uncertainty model. Must match at eval. |
-| `--action_smoothing FLOAT` | `1.0` | EMA filter on the residual to cut jerk. `1.0` = off; `0.3` = moderate; `0.1` = heavy. Must match at eval. |
-| `--watch` | off | Train in a single live GUI window (forces 1 env, slow, max-speed playback). Eyeballing only. |
-| `--watch_all` | off | A GUI window per parallel env (needs `n_envs>1`; resource-heavy/experimental; keep `n_envs` small). |
-| `--watch_first_only` | off | With `--watch_all`, only env 0 gets a window; the rest stay headless (robust, full throughput). |
+| Flag | Default | What it does / sensible values | Example |
+|---|---|---|---|
+| `--mode {residual,end2end}` | `residual` | `residual`: RL correction added on top of the IK controller (recommended). `end2end`: RL outputs the full joint command with no controller — a much harder baseline kept for contrast. | `--mode end2end` |
+| `--timesteps INT` | `200000` | Total env steps. ~50k = quick sanity; 200k per clean/wide curriculum stage; 400k for the uncertainty stage (it has the most to learn). | `--timesteps 400000` |
+| `--episode_seconds FLOAT` | `12.0` | Episode length in seconds (sets max steps). Use **≥16** so even the slowest trajectory finishes a full loop; shorter and the arm never completes a cycle. | `--episode_seconds 16` |
+| `--n_envs INT` | `4` | Parallel headless envs for throughput; 8 is comfortable on one GPU. Ignored when `--watch` (forces 1). | `--n_envs 8` |
+| `--seed INT` | `0` | RNG seed. | `--seed 1` |
+| `--tag STR` | `None` → `mode[+_unc]` | Output name; controls `models/<tag>*` and `runs/<tag>`. Use a unique tag per run so nothing overwrites. | `--tag res_fs_filt6` |
+| `--load PATH` | `None` | Continue from a saved `.zip` (curriculum / fine-tune). Obs dims must match, so you **cannot** load a `frame_stack=1` model into a `frame_stack=4` run. | `--load models/res_fs_wide.zip` |
+| `--wide_workspace` | off | Spread trajectories across the workspace (some segments deliberately unreachable). Off = centred near home, all reachable. On for the generalization stage. | `--wide_workspace` |
+| `--unreachable_frac FLOAT` | `1.0` | With `--wide_workspace`: fraction of episodes placed aggressively. `1.0` = all wide; **`0.4`** = 40 % wide / 60 % reachable (recommended mix); `0.0` = effectively local. Ignored without `--wide_workspace`. | `--wide_workspace --unreachable_frac 0.4` |
+| `--uncertainty` | off | Enable the disturbance model (domain-randomized per episode in training). Off = clean dynamics. | `--uncertainty` |
+| `--unc_vel_gain FLOAT` | `0.70` | Actuator gain (executed = gain × commanded). `1.0` = none; `0.85` = mild (15 % undershoot); `0.70` = hard (30 %). In training sampled per-episode in `[gain, 1]`. | `--uncertainty --unc_vel_gain 0.70` |
+| `--unc_control_delay INT` | `12` | Control latency in sim substeps (240 Hz). `0` = none; `8` ≈ 33 ms; `12` ≈ 50 ms. Sampled per-episode in `[0, value]`. | `--uncertainty --unc_control_delay 12` |
+| `--unc_obs_noise FLOAT` | `0.005` | Std of Gaussian noise on the policy’s observation (robustness only — does **not** touch the controller). | `--uncertainty --unc_obs_noise 0.005` |
+| `--unc_act_noise FLOAT` | `0.02` | Std of Gaussian noise on the executed command (stability stressor). | `--uncertainty --unc_act_noise 0.02` |
+| `--w_track FLOAT` | `1.0` | Weight on the tracking reward `exp(−err/σ)`. | `--w_track 1.0` |
+| `--sigma_pos FLOAT` | `0.02` | Error scale σ (m) in the tracking reward. Smaller = sharper gradient near zero (rewards sub-mm) but flatter far out. Final model used `0.008`. | `--sigma_pos 0.008` |
+| `--w_act FLOAT` | `0.01` | Penalty on residual **magnitude**. Higher pushes the residual toward 0 (helps recover baseline when clean). | `--w_act 0.02` |
+| `--w_smooth FLOAT` | `0.05` | Penalty on action **rate** (jerk). Higher = smoother, but eventually trades accuracy. Final model used `1.5` (with filtering). | `--w_smooth 1.5` |
+| `--frame_stack INT` | `1` | Stack the last N observations for temporal context so the policy can infer the disturbance. `1` = single frame; **`4`** for the uncertainty model. Must match at eval. | `--frame_stack 4` |
+| `--action_smoothing FLOAT` | `1.0` | EMA filter on the residual to cut jerk. `1.0` = off; `0.3` = moderate; `0.1` = heavy. Must match at eval. | `--action_smoothing 0.1` |
+| `--watch` | off | Train in a single live GUI window (forces 1 env, slow, max-speed playback). Eyeballing only. | `--watch` |
+| `--watch_all` | off | A GUI window per parallel env (needs `n_envs>1`; resource-heavy/experimental; keep `n_envs` small). | `--watch_all --n_envs 2` |
+| `--watch_first_only` | off | With `--watch_all`, only env 0 gets a window; the rest stay headless (robust, full throughput). | `--watch_all --watch_first_only` |
+
+**Putting it together** — the final-model (uncertainty) curriculum stage:
+```bash
+python -m scripts.train --mode residual --load models/res_fs_wide.zip \
+    --frame_stack 4 --action_smoothing 0.1 \
+    --sigma_pos 0.008 --w_act 0.02 --w_smooth 1.5 \
+    --wide_workspace --unreachable_frac 0.4 --uncertainty \
+    --timesteps 400000 --n_envs 8 --tag res_fs_filt6
+```
 
 ### `scripts/watch_policy.py`
 
-| Flag | Default | What it does / sensible values |
-|---|---|---|
-| `--model PATH` | *required* | Path to the saved `.zip` policy. |
-| `--mode {residual,end2end}` | *required* | Must match how the model was trained. |
-| `--traj {circle,figure_eight,moving_target}` | `figure_eight` | Trajectory to track. |
-| `--episodes INT` | `1` | Number of episodes to roll out. |
-| `--episode_seconds FLOAT` | `12.0` | Episode length; ≥16 to see a full loop. |
-| `--frame_stack INT` | `1` | **Must match training** (else obs-dim error). |
-| `--action_smoothing FLOAT` | `1.0` | **Must match training.** |
-| `--uncertainty` | off | Evaluate under the fixed disturbance condition. |
-| `--unc_vel_gain / --unc_control_delay / --unc_obs_noise / --unc_act_noise` | `0.70 / 12 / 0.005 / 0.02` | The fixed uncertainty levels (used only with `--uncertainty`); set to match what the model trained under. |
-| `--gui` | off | Live PyBullet window (real-time paced). |
-| `--video` | off | Save an MP4 (records the GUI window if `--gui`, else a headless render). |
-| `--csv` | off | Dump per-step `(t, error, EE xyz, joints)` to CSV. |
-| `--outdir PATH` | `outputs` | Where files are written. |
-| `--label STR` | `None` → model filename | Output name stem. Files are `policy_<label>_<traj>_<clean\|unc>.*`, so different models/conditions never overwrite. |
+| Flag | Default | What it does / sensible values | Example |
+|---|---|---|---|
+| `--model PATH` | *required* | Path to the saved `.zip` policy. | `--model models/res_fs_filt6.zip` |
+| `--mode {residual,end2end}` | *required* | Must match how the model was trained. | `--mode residual` |
+| `--traj {circle,figure_eight,moving_target}` | `figure_eight` | Trajectory to track. | `--traj circle` |
+| `--episodes INT` | `1` | Number of episodes to roll out. | `--episodes 3` |
+| `--episode_seconds FLOAT` | `12.0` | Episode length; ≥16 to see a full loop. | `--episode_seconds 16` |
+| `--frame_stack INT` | `1` | **Must match training** (else obs-dim error). | `--frame_stack 4` |
+| `--action_smoothing FLOAT` | `1.0` | **Must match training.** | `--action_smoothing 0.1` |
+| `--uncertainty` | off | Evaluate under the fixed disturbance condition. | `--uncertainty` |
+| `--unc_vel_gain / --unc_control_delay / --unc_obs_noise / --unc_act_noise` | `0.70 / 12 / 0.005 / 0.02` | The fixed uncertainty levels (used only with `--uncertainty`); set to match what the model trained under. | `--uncertainty --unc_vel_gain 0.70 --unc_control_delay 12` |
+| `--gui` | off | Live PyBullet window (real-time paced). | `--gui` |
+| `--video` | off | Save an MP4 (records the GUI window if `--gui`, else a headless render). | `--gui --video` |
+| `--csv` | off | Dump per-step `(t, error, EE xyz, joints)` to CSV. | `--csv` |
+| `--outdir PATH` | `outputs` | Where files are written. | `--outdir outputs` |
+| `--label STR` | `None` → model filename | Output name stem. Files are `policy_<label>_<traj>_<clean\|unc>.*`, so different models/conditions never overwrite. | `--label filt6` |
+
+**Putting it together** — the headline uncertain demo (live window + MP4 + CSV):
+```bash
+python -m scripts.watch_policy --model models/res_fs_filt6.zip --mode residual \
+    --frame_stack 4 --action_smoothing 0.1 --traj figure_eight \
+    --uncertainty --gui --video --csv
+```
 
 ### `scripts/compare.py`
 
-| Flag | Default | What it does / sensible values |
-|---|---|---|
-| `--residual PATH` | `None` | Residual policy to evaluate. If omitted, only `pure_ik` runs (no model needed). |
-| `--end2end PATH` | `None` | Optional end-to-end policy for a three-way comparison. |
-| `--trajs LIST` | `circle figure_eight moving_target` | Trajectories to average over. |
-| `--seeds INT` | `3` | Runs averaged per cell (mainly averages noise realizations under uncertainty; the per-traj path is fixed). |
-| `--episode_seconds FLOAT` | `16.0` | Episode length. |
-| `--conditions LIST` | `clean uncertain` | Which conditions to evaluate. |
-| `--frame_stack INT` | `1` | **Must match the models.** |
-| `--action_smoothing FLOAT` | `1.0` | **Must match the models.** |
-| `--unc_vel_gain / --unc_control_delay / --unc_obs_noise / --unc_act_noise` | `0.70 / 12 / 0.005 / 0.02` | Fixed uncertainty levels for the `uncertain` condition; match training. |
-| `--outdir PATH` | `outputs` | Where the table/plots go. Use a per-model subdir (e.g. `outputs/filt6_final`) to avoid overwriting earlier runs — the figure filenames themselves are fixed. |
+| Flag | Default | What it does / sensible values | Example |
+|---|---|---|---|
+| `--residual PATH` | `None` | Residual policy to evaluate. If omitted, only `pure_ik` runs (no model needed). | `--residual models/res_fs_filt6.zip` |
+| `--end2end PATH` | `None` | Optional end-to-end policy for a three-way comparison. | `--end2end models/end2end.zip` |
+| `--trajs LIST` | `circle figure_eight moving_target` | Trajectories to average over. | `--trajs circle figure_eight` |
+| `--seeds INT` | `3` | Runs averaged per cell (mainly averages noise realizations under uncertainty; the per-traj path is fixed). | `--seeds 5` |
+| `--episode_seconds FLOAT` | `16.0` | Episode length. | `--episode_seconds 16` |
+| `--conditions LIST` | `clean uncertain` | Which conditions to evaluate. Omit for both; pass one to restrict. | `--conditions uncertain` |
+| `--frame_stack INT` | `1` | **Must match the models.** | `--frame_stack 4` |
+| `--action_smoothing FLOAT` | `1.0` | **Must match the models.** | `--action_smoothing 0.1` |
+| `--unc_vel_gain / --unc_control_delay / --unc_obs_noise / --unc_act_noise` | `0.70 / 12 / 0.005 / 0.02` | Fixed uncertainty levels for the `uncertain` condition; match training. | `--unc_vel_gain 0.70 --unc_control_delay 12` |
+| `--outdir PATH` | `outputs` | Where the table/plots go. Use a per-model subdir (e.g. `outputs/filt6_final`) to avoid overwriting earlier runs — the figure filenames themselves are fixed. | `--outdir outputs/filt6_final` |
+
+**Putting it together** — the final comparison (both conditions, 3 trajectories):
+```bash
+python -m scripts.compare --residual models/res_fs_filt6.zip \
+    --frame_stack 4 --action_smoothing 0.1 \
+    --trajs circle figure_eight moving_target --seeds 3 --outdir outputs/filt6_final
+```
 
 ### `scripts/run_baseline.py` (controller only, no RL)
 
-| Flag | Default | What it does / sensible values |
-|---|---|---|
-| `--traj {circle,figure_eight,moving_target}` | `circle` | Trajectory to track. |
-| `--controller {dls,taskpriority}` | `taskpriority` | `taskpriority` = the full task-priority controller (the baseline used everywhere); `dls` = the minimal single-objective reference controller. |
-| `--seconds FLOAT` | `12.0` | Duration. |
-| `--omega FLOAT` | `0.6` | Trajectory phase rate (rad/s); higher = faster motion. |
-| `--orientation` | off | Also track EE orientation (where supported). |
-| `--gui` | off | Live window. |
-| `--video` | off | Save an MP4. |
-| `--outdir PATH` | `outputs` | Where files are written. |
+| Flag | Default | What it does / sensible values | Example |
+|---|---|---|---|
+| `--traj {circle,figure_eight,moving_target}` | `circle` | Trajectory to track. | `--traj figure_eight` |
+| `--controller {dls,taskpriority}` | `taskpriority` | `taskpriority` = the full task-priority controller (the baseline used everywhere); `dls` = the minimal single-objective reference controller. | `--controller dls` |
+| `--seconds FLOAT` | `12.0` | Duration. | `--seconds 16` |
+| `--omega FLOAT` | `0.6` | Trajectory phase rate (rad/s); higher = faster motion. | `--omega 0.9` |
+| `--orientation` | off | Also track EE orientation (where supported). | `--orientation` |
+| `--gui` | off | Live window. | `--gui` |
+| `--video` | off | Save an MP4. | `--gui --video` |
+| `--outdir PATH` | `outputs` | Where files are written. | `--outdir outputs` |
+
+**Putting it together** — the pure-IK baseline demo with a recorded window:
+```bash
+python -m scripts.run_baseline --traj figure_eight --controller taskpriority \
+    --seconds 16 --gui --video
+```
 
 ---
 
@@ -337,8 +366,4 @@ This is a deliberately honest result, not a "wins everywhere" claim.
 - **Held-out trajectory shapes** (Lissajous, spiral, raster) to quantify true
   generalization beyond the training families.
 
----
 
-## License
-
-MIT (or your choice).
