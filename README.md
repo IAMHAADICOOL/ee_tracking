@@ -218,4 +218,4 @@ This is a deliberately honest result, not a "wins everywhere" claim.
 
 ## License
 
-MIT (or your choice).
+MIT License — Copyright (c) 2026 Mohammad Haadi Akhter
