@@ -117,13 +117,22 @@ The three families:
 |---|---|---|
 | `circle` | Vertical circle in the y–z plane | `center + r·[0, cos φ, sin φ]`, r = 0.15 m |
 | `figure_eight` | Gerono lemniscate (smooth figure-eight) | `center + [0, a·sin φ, b·sin φ·cos φ]`, a = 0.18, b = 0.12 |
-| `moving_target` | Non-repeating C-∞ wander | per-axis sum of 3 seeded incommensurate sinusoids, kept inside a box; x-extent shallow so it stays on the reachable shell |
+| `moving_target` | Smooth, never-repeating wander inside a box | 3 random sine waves added together per axis (see below) |
+
+**`moving_target`, in plain terms:** instead of a fixed shape, each axis (x, y, z) gets its
+own wobble made by adding 3 sine waves of different, non-matching speeds and random starting
+points. Because the speeds don't line up evenly, the combined wobble drifts and never falls
+back into the same pattern — but since it's still just sine waves added together, the path
+stays perfectly smooth, with no sharp turns. The same random seed always produces the same
+wander, so results are reproducible. The sideways/vertical wobble is kept larger than the
+forward/back wobble, so the target stays comfortably inside the arm's reach.
 
 On top of the instantaneous target, the **observation includes a short preview** — the target
 sampled at several future horizons (≈0.05 / 0.1 / 0.2 / 0.4 s ahead) — which is what lets the
 learned residual lead a delayed system rather than lag it.
 
 ---
+
 
 ## Repository structure
 
