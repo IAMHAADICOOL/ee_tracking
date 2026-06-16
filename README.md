@@ -93,6 +93,48 @@ See [REPORT.md](REPORT.md) for the full design rationale and the experimental pr
 
 ---
 
+## Trajectory representation
+
+Each trajectory (`src/arm_tracking/trajectories.py`) is a callable
+`phase → (position, velocity)`. Two deliberate choices:
+
+- **Parametrized by phase (radians), not wall-clock time.** The env advances
+  `phase += omega · dt`, so the same trajectory object works at any control rate and any
+  traversal speed — change `omega` to go faster without redefining the curve.
+- **Anchored at a reachable `center`.** All curves are offset from a center point (the
+  home-pose EE position by default), so the path sits inside the workspace. In
+  `--wide_workspace` the center is sampled across a box, deliberately pushing parts of the
+  curve out of reach.
+
+Crucially, each call returns the **analytic velocity** alongside the position. That velocity
+is used two ways: as **feedforward** to the controller and as part of the policy's
+**preview**, so the system *anticipates* the path instead of chasing where the target just
+was — essential for tracking a moving target under latency.
+
+The three families:
+
+| Name | Shape | Definition |
+|---|---|---|
+| `circle` | Vertical circle in the y–z plane | `center + r·[0, cos φ, sin φ]`, r = 0.15 m |
+| `figure_eight` | Gerono lemniscate (smooth figure-eight) | `center + [0, a·sin φ, b·sin φ·cos φ]`, a = 0.18, b = 0.12 |
+| `moving_target` | Non-repeating C-∞ wander | per-axis sum of 3 seeded incommensurate sinusoids, kept inside a box; x-extent shallow so it stays on the reachable shell |
+
+On top of the instantaneous target, the **observation includes a short preview** — the target
+sampled at several future horizons (≈0.05 / 0.1 / 0.2 / 0.4 s ahead) — which is what lets the
+learned residual lead a delayed system rather than lag it.
+
+## Optional: orientation tracking
+
+The focus (and the RL residual) is position tracking, but the task-priority framework also
+includes an `OrientationTask` and a combined 6-DOF `ConfigurationTask` (position + orientation).
+The controller can track pose end-to-end:
+
+```bash
+python -m scripts.run_baseline --traj circle --orientation --gui
+```
+
+---
+
 ## Repository structure
 
 ```
@@ -365,5 +407,4 @@ This is a deliberately honest result, not a "wins everywhere" claim.
 - **Recurrent / longer-history policy** for sharper online system identification.
 - **Held-out trajectory shapes** (Lissajous, spiral, raster) to quantify true
   generalization beyond the training families.
-
 
