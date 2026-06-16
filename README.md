@@ -123,16 +123,6 @@ On top of the instantaneous target, the **observation includes a short preview**
 sampled at several future horizons (≈0.05 / 0.1 / 0.2 / 0.4 s ahead) — which is what lets the
 learned residual lead a delayed system rather than lag it.
 
-## Optional: orientation tracking
-
-The focus (and the RL residual) is position tracking, but the task-priority framework also
-includes an `OrientationTask` and a combined 6-DOF `ConfigurationTask` (position + orientation).
-The controller can track pose end-to-end:
-
-```bash
-python -m scripts.run_baseline --traj circle --orientation --gui
-```
-
 ---
 
 ## Repository structure
@@ -332,7 +322,15 @@ python -m scripts.compare --residual models/res_fs_filt6.zip \
 python -m scripts.run_baseline --traj figure_eight --controller taskpriority \
     --seconds 16 --gui --video
 ```
+## Optional: orientation tracking
 
+The focus (and the RL residual) is position tracking, but the task-priority framework also
+includes an `OrientationTask` and a combined 6-DOF `ConfigurationTask` (position + orientation).
+The controller can track pose end-to-end:
+
+```bash
+python -m scripts.run_baseline --traj circle --orientation --gui
+```
 ---
 
 ## Results and figures
