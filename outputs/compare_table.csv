@@ -1,0 +1,5 @@
+controller,condition,command_jitter,ee_jerk_rms,joint_jerk_rms,max_mm,rmse_mm,rmse_ss_mm,sparc
+pure_ik,clean,0.0000,0.4174,0.4709,73.3319,6.7722,0.2088,-3.2126
+pure_ik,uncertain,0.0000,83.0068,93.0929,82.1272,13.1410,8.6290,-3.1995
+residual,clean,0.0242,1.3169,20.2638,75.6457,7.9006,4.2108,-3.4723
+residual,uncertain,0.0991,73.3509,92.5654,80.1906,9.1999,3.1550,-3.6011
